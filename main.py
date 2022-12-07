@@ -141,7 +141,7 @@ def buildData():
         key = item[0]
         value = item[1]
         TB.add_row([key, value.xp, value.yp])
-    print(TB)
+    # print(TB)
 
     TB = pt.PrettyTable()
     TB.title = "Node Info"
@@ -150,7 +150,7 @@ def buildData():
         key = item[0]
         value = item[1]
         TB.add_row([key, value.type, value.topo.id, value.neighIDList])
-    print(TB)
+    # print(TB)
 
     TB = pt.PrettyTable()
     TB.title = "Section Info"
@@ -161,14 +161,14 @@ def buildData():
         value = item[1]
         TB.add_row([key, value.type, value.grade, value.origin.id, value.dest.id, value.length, value.speed, value.num,
                     value.topoDLink.id, value.topoDLink.topoLinkList])
-    print(TB)
+    # print(TB)
 
     # 输出最大ID值
     TB = pt.PrettyTable()
     TB.title = "MAX ID Info"
     TB.field_names = ["MAXNODEID", "MAXTOPONODEID", "MAXSECTIONID", "MAXTOPODLINKID"]
     TB.add_row([MAXNODEID, MAXTOPONODEID, MAXSECTIONID, MAXTOPODLINKID])
-    print(TB)
+    # print(TB)
     return topoMap, nodeMap, sectionMap
 
 
@@ -211,7 +211,7 @@ def operateNode(node: Structure.Node, sec: Structure.Section) -> Structure.Node:
     # 2.3 计算拆点坐标
     x = (x2 - x1) * ratio + x1
     y = (y2 - y1) * ratio + y1
-    print("Coor:", x, y)
+    # print("Coor:{} ({}, {})".format(node.id, x, y))
 
     """
     新增操作：
@@ -272,10 +272,10 @@ def splitNode(node, sectionMap):
             continue
 
         # 更新对向路段几何信息 (起终点、拓扑点集合)
-        if node.id == preOriginId:
+        if node.id == oppoSec.origin.id:
             oppoSec.origin = newNode
             oppoSec.topoDLink.topoLinkList[0] = MAXTOPONODEID
-        elif node.id == preDestId:
+        elif node.id == oppoSec.dest.id:
             oppoSec.dest = newNode
             oppoSec.topoDLink.topoLinkList[-1] = MAXTOPONODEID
 
@@ -289,6 +289,7 @@ def splitNode(node, sectionMap):
 def splitNetwork(topoMap, nodeMap, sectionMap):
     # 1. 查找转换节点
     newAllNodeList = []
+    needClearNodeList = []
     for node in nodeMap.values():
 
         # 5 - 火车站 6 - 码头 7 - 机场 8 - 综合交通枢纽
@@ -298,6 +299,7 @@ def splitNetwork(topoMap, nodeMap, sectionMap):
         # 2.对筛选节点进行拆分
         newOnceNodeList = splitNode(node, sectionMap)
         newAllNodeList.append(newOnceNodeList)
+        needClearNodeList.append(node)
 
         # 3. 新建路段
         print("********************")
@@ -329,14 +331,21 @@ def splitNetwork(topoMap, nodeMap, sectionMap):
 
                 sectionMap[newSec.id] = newSec
 
+    # 添加新建信息至容器
     for onceList in newAllNodeList:
         for node in onceList:
             topoMap[node.topo.id] = node.topo
             nodeMap[node.id] = node
 
+    # 删除拆分节点
+    for deleteNode in needClearNodeList:
+        _id = deleteNode.id
+        del nodeMap[_id]
+        del topoMap[_id]
+
 
 def writeToFile(fileName: str, content: list):
-    with open(fileName, "a") as file:
+    with open(fileName, "w") as file:
         for line in content:
             file.writelines((line + "\n"))
 
@@ -365,8 +374,6 @@ def getFileContent(topoMap, nodeMap, sectionMap):
         topid = str(node.topo.id)
         line = f"{_id} {topid} {topid}"
         nodeTonodeWriteContent.append(line)
-
-    print(connWriteContent)
 
     geomWriteContent = []
     topoDLinkWriteContent = []
@@ -407,6 +414,10 @@ def getFileContent(topoMap, nodeMap, sectionMap):
         line = f"{_id} {xp} {yp}"
         toponodeWriteContent.append(line)
 
+    # 排序 topoDLinkWriteContent
+    # func = lambda topoDLinkWriteContent : int(topoDLinkWriteContent.spl[0])
+
+    topoDLinkWriteContent.sort(key=lambda _line: int(_line.split(" ")[0]))
     return [connWriteContent, contWriteContent, nodeTonodeWriteContent, geomWriteContent, topoDLinkWriteContent,
             linkToLinkWriteContent, toponodeWriteContent]
 
@@ -422,9 +433,9 @@ def outPutResult(topoMap, nodeMap, sectionMap):
     i = 0
     for fileContent in allContentList:
         filePath = _dir + fileName[i]
-        print("******************************")
-        print(fileName[i])
-        print(fileContent)
+        # print("******************************")
+        # print(fileName[i])
+        # print(fileContent)
         writeToFile(filePath, fileContent)
         i += 1
 
