@@ -5,7 +5,7 @@
 import os
 
 import math
-import datetime
+import time
 import prettytable as pt
 
 import Structure
@@ -34,6 +34,10 @@ SHOW_NODE = False
 SHOW_SECTION = False
 SHOW_MAXID = False
 
+topoMap = {}  # topoid  ---> TopoNode
+nodeMap = {}  # 节点id  ---> Node 对象
+sectionMap = {}  # 节点id  ---> Node 对象
+
 
 def readFromFile(fileName: str):
     print(f"Read file: {fileName}")
@@ -51,32 +55,21 @@ def readFromFile(fileName: str):
     return content
 
 
-def buildData():
-    connContent = readFromFile(connFile)
-    contContent = readFromFile(contFile)
-    coorContent = readFromFile(coorFile)
-    geomContent = readFromFile(geomFile)
-
-    linkToLinkContent = readFromFile(linkToLinkFile)
-    nodeTonodeContent = readFromFile(nodeTonodeFile)
-    topodlinkContent = readFromFile(topodlinkFile)
-    toponodeContent = readFromFile(toponodeFile)
-
-    topoMap = {}  # topoid  ---> TopoNode
-    topoDLinkMap = {}  # topodlink.txt 文件信息 路段的拓扑点集合
-    nodeMap = {}  # 节点id  ---> Node 对象
-    sectionMap = {}  # 节点id  ---> Node 对象
-
-    # 1. 读取 topoNode
+def buildTopoNode(toponodeContent):
     for element in toponodeContent:
         _id = int(element[0])
         xp = float(element[1])
         yp = float(element[2])
         topo = Structure.TopoNode(_id, xp, yp)
         topoMap[_id] = topo
+
         global MAXTOPONODEID
         MAXTOPONODEID = max(MAXTOPONODEID, _id)
 
+    print("End the buildTopoNode.")
+
+
+def buildNode(connContent, contContent, nodeTonodeContent):
     for i in range(len(connContent)):
         # conn
         _id = int(connContent[i][0])
@@ -86,10 +79,7 @@ def buildData():
         MAXNODEID = max(MAXNODEID, _id)
 
         # 类型转换
-        newneighList = []
-        for ele in neighList:
-            ele = int(ele)
-            newneighList.append(ele)
+        newneighList = [int(ele) for ele in neighList]
 
         # cont
         _type = int(contContent[i][1])
@@ -108,6 +98,11 @@ def buildData():
             point = Structure.Node(_id, _type, topoNodeObj, newneighList)
             nodeMap[_id] = point
 
+    print("End the buildNode.")
+
+
+def buildSection(geomContent, topodlinkContent, linkToLinkContent):
+    topoDLinkMap = {}  # topodlink.txt 文件信息 路段的拓扑点集合
     for i in range(len(geomContent)):
         # geom
         origin = int(geomContent[i][0])
@@ -121,9 +116,7 @@ def buildData():
         # topodlink
         for element in topodlinkContent:
             _topoLinkID = int(element[0])
-            topoDLinkList = []
-            for e in element[2:]:
-                topoDLinkList.append(int(e))
+            topoDLinkList = [int(e) for e in element[2:]]
             topoLink = Structure.TopoLink(_topoLinkID, topoDLinkList)
             topoDLinkMap[_topoLinkID] = topoLink
 
@@ -138,12 +131,19 @@ def buildData():
         MAXSECTIONID = max(MAXSECTIONID, secID)
 
         # 转换成 Node 对象
-        originPt = nodeMap[origin]
-        destPt = nodeMap[dest]
+        originPt = nodeMap.get(origin)
+        destPt = nodeMap.get(dest)
+        if originPt is None and destPt is None:
+            print("起终点错误")
 
         sec = Structure.Section(secID, _type, grade, originPt, destPt, length, speed, num, topoDLinkMap[topoLinkID])
         sectionMap[secID] = sec
+        print(f"build Section: ({origin}, {dest})")
 
+    print("End the buildSection.")
+
+
+def showBuildData():
     if SHOW_TOPONODE:
         TB = pt.PrettyTable()
         TB.title = "TopoNode Info"
@@ -185,7 +185,29 @@ def buildData():
         TB.add_row([MAXNODEID, MAXTOPONODEID, MAXSECTIONID, MAXTOPODLINKID])
         print(TB)
 
-    return topoMap, nodeMap, sectionMap
+
+def buildData():
+    connContent = readFromFile(connFile)
+    contContent = readFromFile(contFile)
+    coorContent = readFromFile(coorFile)
+    geomContent = readFromFile(geomFile)
+
+    linkToLinkContent = readFromFile(linkToLinkFile)
+    nodeTonodeContent = readFromFile(nodeTonodeFile)
+    topodlinkContent = readFromFile(topodlinkFile)
+    toponodeContent = readFromFile(toponodeFile)
+
+    # 1. 构建 topoNode
+    buildTopoNode(toponodeContent)
+
+    # 2. 构建 Node
+    buildNode(connContent, contContent, nodeTonodeContent)
+
+    # 3. 构建 section
+    buildSection(geomContent, topodlinkContent, linkToLinkContent)
+
+    # 4. 输出信息
+    showBuildData()
 
 
 def getSectionLen(originType, destType) -> float:
@@ -305,10 +327,11 @@ def splitNode(node, sectionMap, nodeRelatedSecTypeMap):
     return newNodeList
 
 
-def splitNetwork(topoMap, nodeMap, sectionMap):
+def splitNetwork():
     newAllNodeList = []
     needClearNodeList = []
     nodeRelatedSecTypeMap = {}
+    print("**********BEG**********")
     for node in nodeMap.values():
 
         # 1. 查找转换节点
@@ -317,7 +340,6 @@ def splitNetwork(topoMap, nodeMap, sectionMap):
             continue
 
         # 2.对筛选节点进行拆分
-        print("**********BEG**********")
         newOnceNodeList = splitNode(node, sectionMap, nodeRelatedSecTypeMap)
         newAllNodeList.append(newOnceNodeList)
         needClearNodeList.append(node)
@@ -325,7 +347,7 @@ def splitNetwork(topoMap, nodeMap, sectionMap):
         # 3. 新建路段
         pList = [node.id for node in newOnceNodeList]
         print("new Node id: ", pList)
-        print("**********END**********\n")
+
 
         for i in range(0, len(newOnceNodeList)):
             for j in range(0, len(newOnceNodeList)):
@@ -353,6 +375,8 @@ def splitNetwork(topoMap, nodeMap, sectionMap):
                                            topoLink)
 
                 sectionMap[newSec.id] = newSec
+
+    print("**********END**********\n")
 
     # 添加新建信息至容器
     for onceList in newAllNodeList:
@@ -447,7 +471,7 @@ def getFileContent(topoMap, nodeMap, sectionMap):
             linkToLinkWriteContent, toponodeWriteContent]
 
 
-def outPutResult(topoMap, nodeMap, sectionMap):
+def outPutResult():
     allContentList = getFileContent(topoMap, nodeMap, sectionMap)
     # 写入文件 [connWriteContent, contWriteContent, nodeTonodeWriteContent, geomWriteContent, topoDLinkWriteContent,
     # linkToLinkWriteContent, toponodeWriteContent]
@@ -467,22 +491,25 @@ def outPutResult(topoMap, nodeMap, sectionMap):
 
 def run():
     # 1.从文件构建结构体数据
-    current_time = datetime.datetime.now()
-    print("Begin to build data:")
-    print("current time: " + str(current_time))
-    topoMap, nodeMap, sectionMap = buildData()
+    # t0 = time.strftime("%H:%M:%S", time.localtime(time.time()))
+    t0 = time.time()
+    print("Begin to build data:", t0)
+    buildData()
 
     # 2.拆网
-    current_time = datetime.datetime.now()
-    print("Begin to splitNetwork:")
-    print("current time: " + str(current_time))
-    splitNetwork(topoMap, nodeMap, sectionMap)
+    t1 = time.time()
+    print("Begin to splitNetwork:", t1)
+    splitNetwork()
 
     # 3.写入文件
-    current_time = datetime.datetime.now()
-    print("Begin to output:")
-    print("current time: " + str(current_time))
-    outPutResult(topoMap, nodeMap, sectionMap)
+    t2 = time.time()
+    print("Begin to output:", t2)
+    outPutResult()
+    t3 = time.time()
+
+    print("-----build time: ", t1 - t0)
+    print("-----build time: ", t2 - t1)
+    print("-----build time: ", t3 - t2)
 
 
 def main():
