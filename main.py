@@ -4,23 +4,22 @@
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 import os
 
+import math
+import datetime
 import prettytable as pt
-from shapely.geometry import Point
-from shapely.geometry import LineString
 
 import Structure
-import math
 
-dataPath = "./scheme/枢纽网络构建/最小的实验网/data/"
-connFile = dataPath + "Tconn.txt"  # [0 4 1 2 3 4]
-contFile = dataPath + "Tcont.txt"  # [0 5}
-coorFile = dataPath + "Tcoor.txt"  # [0 -45.454545454545503 107.438016528925601]
-geomFile = dataPath + "Tgeom.txt"  # [0 1 2 21 159.38 0 2]
+dataPath: str = "./scheme/枢纽网络构建/基础方案/data/"
+connFile: str = dataPath + "Tconn.txt"
+contFile: str = dataPath + "Tcont.txt"
+coorFile: str = dataPath + "Tcoor.txt"
+geomFile: str = dataPath + "Tgeom.txt"
 
-linkToLinkFile: str = dataPath + "Tlink-topodlink.txt"  # [0 1 1 1]
-nodeTonodeFile = dataPath + "Tnode-toponode.txt"  # [0 0 0]
-topodlinkFile = dataPath + "Ttopodlink.txt"  # [0 2 1 0]
-toponodeFile = dataPath + "Ttoponode.txt"  # [0 -45.454545454545503 107.438016528925601]
+linkToLinkFile: str = dataPath + "Tlink-topodlink.txt"
+nodeTonodeFile: str = dataPath + "Tnode-toponode.txt"
+topodlinkFile: str = dataPath + "Ttopodlink.txt"
+toponodeFile: str = dataPath + "Ttoponode.txt"
 
 radius = 0.001
 
@@ -29,8 +28,15 @@ MAXTOPONODEID = 0
 MAXSECTIONID = 0
 MAXTOPODLINKID = 0
 
+# 输出控制
+SHOW_TOPONODE = False
+SHOW_NODE = False
+SHOW_SECTION = False
+SHOW_MAXID = False
+
 
 def readFromFile(fileName: str):
+    print(f"Read file: {fileName}")
     content = []  # [[], [],]
     with open(fileName, 'r') as f:
         for line in f:
@@ -95,6 +101,10 @@ def buildData():
         # 节点坐标
         if _id == nodeID:  # 文件正常情况下，一定会相等
             topoNodeObj = topoMap.get(topoID)
+
+            if topoNodeObj is None:
+                print("TopoNode is None:", _id)
+
             point = Structure.Node(_id, _type, topoNodeObj, newneighList)
             nodeMap[_id] = point
 
@@ -134,41 +144,47 @@ def buildData():
         sec = Structure.Section(secID, _type, grade, originPt, destPt, length, speed, num, topoDLinkMap[topoLinkID])
         sectionMap[secID] = sec
 
-    TB = pt.PrettyTable()
-    TB.title = "TopoNode Info"
-    TB.field_names = ["id", "xp", "yp"]
-    for item in topoMap.items():
-        key = item[0]
-        value = item[1]
-        TB.add_row([key, value.xp, value.yp])
-    # print(TB)
+    if SHOW_TOPONODE:
+        TB = pt.PrettyTable()
+        TB.title = "TopoNode Info"
+        TB.field_names = ["id", "xp", "yp"]
+        for item in topoMap.items():
+            key = item[0]
+            value = item[1]
+            TB.add_row([key, value.xp, value.yp])
+        print(TB)
 
-    TB = pt.PrettyTable()
-    TB.title = "Node Info"
-    TB.field_names = ["id", "type", "TopoNode ID", "neighIDList"]
-    for item in nodeMap.items():
-        key = item[0]
-        value = item[1]
-        TB.add_row([key, value.type, value.topo.id, value.neighIDList])
-    # print(TB)
+    if SHOW_NODE:
+        TB = pt.PrettyTable()
+        TB.title = "Node Info"
+        TB.field_names = ["id", "type", "TopoNode ID", "neighIDList"]
+        for item in nodeMap.items():
+            key = item[0]
+            value = item[1]
+            TB.add_row([key, value.type, value.topo.id, value.neighIDList])
+        print(TB)
 
-    TB = pt.PrettyTable()
-    TB.title = "Section Info"
-    TB.field_names = ["id", "type", "grade", "origin", "destination", "length", "speed", "num", "topoDLink ID",
-                      "topoDLink"]
-    for item in sectionMap.items():
-        key = item[0]
-        value = item[1]
-        TB.add_row([key, value.type, value.grade, value.origin.id, value.dest.id, value.length, value.speed, value.num,
-                    value.topoDLink.id, value.topoDLink.topoLinkList])
-    # print(TB)
+    if SHOW_SECTION:
+        TB = pt.PrettyTable()
+        TB.title = "Section Info"
+        TB.field_names = ["id", "type", "grade", "origin", "destination", "length", "speed", "num", "topoDLink ID",
+                          "topoDLink"]
+        for item in sectionMap.items():
+            key = item[0]
+            value = item[1]
+            TB.add_row(
+                [key, value.type, value.grade, value.origin.id, value.dest.id, value.length, value.speed, value.num,
+                 value.topoDLink.id, value.topoDLink.topoLinkList])
+        print(TB)
 
     # 输出最大ID值
-    TB = pt.PrettyTable()
-    TB.title = "MAX ID Info"
-    TB.field_names = ["MAXNODEID", "MAXTOPONODEID", "MAXSECTIONID", "MAXTOPODLINKID"]
-    TB.add_row([MAXNODEID, MAXTOPONODEID, MAXSECTIONID, MAXTOPODLINKID])
-    # print(TB)
+    if SHOW_MAXID:
+        TB = pt.PrettyTable()
+        TB.title = "MAX ID Info"
+        TB.field_names = ["MAXNODEID", "MAXTOPONODEID", "MAXSECTIONID", "MAXTOPODLINKID"]
+        TB.add_row([MAXNODEID, MAXTOPONODEID, MAXSECTIONID, MAXTOPODLINKID])
+        print(TB)
+
     return topoMap, nodeMap, sectionMap
 
 
@@ -249,7 +265,7 @@ def operateNode(node: Structure.Node, sec: Structure.Section) -> Structure.Node:
     return newNode
 
 
-def splitNode(node, sectionMap):
+def splitNode(node, sectionMap, nodeRelatedSecTypeMap):
     # 1.找出连接的路段
     print("split node: ", node.id)
     newNodeList = []
@@ -283,28 +299,33 @@ def splitNode(node, sectionMap):
         eliminateSecList.append(sec.id)
         eliminateSecList.append(oppoSec.id)
 
+        # 添加路段类型映射
+        nodeRelatedSecTypeMap[newNode.id] = sec.type
+
     return newNodeList
 
 
 def splitNetwork(topoMap, nodeMap, sectionMap):
-    # 1. 查找转换节点
     newAllNodeList = []
     needClearNodeList = []
+    nodeRelatedSecTypeMap = {}
     for node in nodeMap.values():
 
+        # 1. 查找转换节点
         # 5 - 火车站 6 - 码头 7 - 机场 8 - 综合交通枢纽
-        if not (5 <= node.type <= 8):  # 不满足条件进行下一次循环
+        if not (5 <= node.type <= 7):  # 不满足条件进行下一次循环
             continue
 
         # 2.对筛选节点进行拆分
-        newOnceNodeList = splitNode(node, sectionMap)
+        print("**********BEG**********")
+        newOnceNodeList = splitNode(node, sectionMap, nodeRelatedSecTypeMap)
         newAllNodeList.append(newOnceNodeList)
         needClearNodeList.append(node)
 
         # 3. 新建路段
-        print("********************")
         pList = [node.id for node in newOnceNodeList]
         print("new Node id: ", pList)
+        print("**********END**********\n")
 
         for i in range(0, len(newOnceNodeList)):
             for j in range(0, len(newOnceNodeList)):
@@ -319,7 +340,9 @@ def splitNetwork(topoMap, nodeMap, sectionMap):
                 MAXSECTIONID += 1
                 newType = 2
                 newGrade = 21
-                _len = getSectionLen(newOnceNodeList[i].type, newOnceNodeList[j].type)
+                originType = nodeRelatedSecTypeMap.get(newOnceNodeList[i].id)
+                destType = nodeRelatedSecTypeMap.get(newOnceNodeList[j].id)
+                _len = getSectionLen(originType, destType)
 
                 global MAXTOPODLINKID
                 MAXTOPODLINKID += 1
@@ -341,7 +364,9 @@ def splitNetwork(topoMap, nodeMap, sectionMap):
     for deleteNode in needClearNodeList:
         _id = deleteNode.id
         del nodeMap[_id]
-        del topoMap[_id]
+
+        topoID = deleteNode.topo.id
+        del topoMap[topoID]
 
 
 def writeToFile(fileName: str, content: list):
@@ -440,19 +465,28 @@ def outPutResult(topoMap, nodeMap, sectionMap):
         i += 1
 
 
-def process():
+def run():
     # 1.从文件构建结构体数据
+    current_time = datetime.datetime.now()
+    print("Begin to build data:")
+    print("current time: " + str(current_time))
     topoMap, nodeMap, sectionMap = buildData()
 
     # 2.拆网
+    current_time = datetime.datetime.now()
+    print("Begin to splitNetwork:")
+    print("current time: " + str(current_time))
     splitNetwork(topoMap, nodeMap, sectionMap)
 
     # 3.写入文件
+    current_time = datetime.datetime.now()
+    print("Begin to output:")
+    print("current time: " + str(current_time))
     outPutResult(topoMap, nodeMap, sectionMap)
 
 
 def main():
-    process()
+    run()
 
 
 main()
