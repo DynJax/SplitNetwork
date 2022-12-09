@@ -10,7 +10,9 @@ import prettytable as pt
 
 import Structure
 
-dataPath: str = "./scheme/枢纽网络构建/基础方案/data/"
+dataPath: str = "./scheme/枢纽网络构建/最小的实验网/data/"
+# dataPath: str = "./scheme/枢纽网络构建/基础方案/data/"
+
 connFile: str = dataPath + "Tconn.txt"
 contFile: str = dataPath + "Tcont.txt"
 coorFile: str = dataPath + "Tcoor.txt"
@@ -39,6 +41,19 @@ nodeMap = {}  # 节点id  ---> Node 对象
 sectionMap = {}  # 节点id  ---> Node 对象
 
 
+def wapper(function):
+    def inner(*args, **kwargs):
+        startTime = time.time()
+        print("*********************************************")
+        print("Begin the {}:".format(function.__name__))
+        ret = function(*args)
+        endTime = time.time()
+        print("End   the {}: {:.15}".format(function.__name__, endTime - startTime))
+        print("*********************************************\n")
+        return  ret
+    return inner
+
+
 def readFromFile(fileName: str):
     print(f"Read file: {fileName}")
     content = []  # [[], [],]
@@ -55,6 +70,7 @@ def readFromFile(fileName: str):
     return content
 
 
+@wapper
 def buildTopoNode(toponodeContent):
     for element in toponodeContent:
         _id = int(element[0])
@@ -66,9 +82,8 @@ def buildTopoNode(toponodeContent):
         global MAXTOPONODEID
         MAXTOPONODEID = max(MAXTOPONODEID, _id)
 
-    print("End the buildTopoNode.")
 
-
+@wapper
 def buildNode(connContent, contContent, nodeTonodeContent):
     for i in range(len(connContent)):
         # conn
@@ -98,9 +113,8 @@ def buildNode(connContent, contContent, nodeTonodeContent):
             point = Structure.Node(_id, _type, topoNodeObj, newneighList)
             nodeMap[_id] = point
 
-    print("End the buildNode.")
 
-
+@wapper
 def buildSection(geomContent, topodlinkContent, linkToLinkContent):
     topoDLinkMap = {}  # topodlink.txt 文件信息 路段的拓扑点集合
     for i in range(len(geomContent)):
@@ -140,9 +154,8 @@ def buildSection(geomContent, topodlinkContent, linkToLinkContent):
         sectionMap[secID] = sec
         print(f"build Section: ({origin}, {dest})")
 
-    print("End the buildSection.")
 
-
+@wapper
 def showBuildData():
     if SHOW_TOPONODE:
         TB = pt.PrettyTable()
@@ -186,6 +199,7 @@ def showBuildData():
         print(TB)
 
 
+@wapper
 def buildData():
     connContent = readFromFile(connFile)
     contContent = readFromFile(contFile)
@@ -287,6 +301,7 @@ def operateNode(node: Structure.Node, sec: Structure.Section) -> Structure.Node:
     return newNode
 
 
+@wapper
 def splitNode(node, sectionMap, nodeRelatedSecTypeMap):
     # 1.找出连接的路段
     print("split node: ", node.id)
@@ -327,6 +342,7 @@ def splitNode(node, sectionMap, nodeRelatedSecTypeMap):
     return newNodeList
 
 
+@wapper
 def splitNetwork():
     newAllNodeList = []
     needClearNodeList = []
@@ -345,6 +361,7 @@ def splitNetwork():
         needClearNodeList.append(node)
 
         # 3. 新建路段
+        print("newOnceNodeList size: ", len(newOnceNodeList))
         pList = [node.id for node in newOnceNodeList]
         print("new Node id: ", pList)
 
@@ -471,6 +488,7 @@ def getFileContent(topoMap, nodeMap, sectionMap):
             linkToLinkWriteContent, toponodeWriteContent]
 
 
+@wapper
 def outPutResult():
     allContentList = getFileContent(topoMap, nodeMap, sectionMap)
     # 写入文件 [connWriteContent, contWriteContent, nodeTonodeWriteContent, geomWriteContent, topoDLinkWriteContent,
@@ -492,24 +510,13 @@ def outPutResult():
 def run():
     # 1.从文件构建结构体数据
     # t0 = time.strftime("%H:%M:%S", time.localtime(time.time()))
-    t0 = time.time()
-    print("Begin to build data:", t0)
     buildData()
 
     # 2.拆网
-    t1 = time.time()
-    print("Begin to splitNetwork:", t1)
     splitNetwork()
 
     # 3.写入文件
-    t2 = time.time()
-    print("Begin to output:", t2)
     outPutResult()
-    t3 = time.time()
-
-    print("-----build time: ", t1 - t0)
-    print("-----build time: ", t2 - t1)
-    print("-----build time: ", t3 - t2)
 
 
 def main():
