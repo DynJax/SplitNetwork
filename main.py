@@ -11,7 +11,7 @@ import prettytable as pt
 import Structure
 
 dataPath: str = "./scheme/枢纽网络构建/最小的实验网/data/"
-# dataPath: str = "./scheme/枢纽网络构建/基础方案/data/"
+dataPath: str = "./scheme/枢纽网络构建/基础方案/data/"
 
 connFile: str = dataPath + "Tconn.txt"
 contFile: str = dataPath + "Tcont.txt"
@@ -48,7 +48,7 @@ def wapper(function):
         print("Begin the {}:".format(function.__name__))
         ret = function(*args)
         endTime = time.time()
-        print("End   the {}: {:.15}".format(function.__name__, endTime - startTime))
+        print("End   the {}: Total time:{:.15}".format(function.__name__, endTime - startTime))
         print("*********************************************\n")
         return  ret
     return inner
@@ -256,7 +256,7 @@ def operateNode(node: Structure.Node, sec: Structure.Section) -> Structure.Node:
     ratio = radius / _len
 
     # 2.2 判断起终点
-    if node == sec.dest:
+    if node is sec.dest:
         # print("Dest", sec.id)
         ratio = 1.0 - ratio
 
@@ -282,7 +282,7 @@ def operateNode(node: Structure.Node, sec: Structure.Section) -> Structure.Node:
     global MAXNODEID
     MAXNODEID += 1
     newNodeType = 8
-    if node == sec.dest:
+    if node is sec.dest:
         neighIDList = [sec.origin.id]
     else:
         neighIDList = [sec.dest.id]
@@ -291,12 +291,21 @@ def operateNode(node: Structure.Node, sec: Structure.Section) -> Structure.Node:
     # newNodeList.append(newNode)
 
     # 3.3 更新路段几何信息 (起终点、拓扑点集合)
-    if node == sec.origin:
+    if node is sec.origin:
         sec.origin = newNode
         sec.topoDLink.topoLinkList[0] = MAXTOPONODEID
-    elif node == sec.dest:
+
+        # 3.4 更新邻接目录表
+        sec.dest.neighIDList.remove(node.id)
+        sec.dest.neighIDList.append(newNode.id)
+
+    elif node is sec.dest:
         sec.dest = newNode
         sec.topoDLink.topoLinkList[-1] = MAXTOPONODEID
+
+        # 3.4 更新邻接目录表
+        sec.origin.neighIDList.remove(node.id)
+        sec.origin.neighIDList.append(newNode.id)
 
     return newNode
 
@@ -365,7 +374,6 @@ def splitNetwork():
         pList = [node.id for node in newOnceNodeList]
         print("new Node id: ", pList)
 
-
         for i in range(0, len(newOnceNodeList)):
             for j in range(0, len(newOnceNodeList)):
                 if newOnceNodeList[i] is newOnceNodeList[j]:
@@ -395,7 +403,7 @@ def splitNetwork():
 
     print("**********END**********\n")
 
-    # 添加新建信息至容器
+    # 添加新建拓扑点、节点信息至容器
     for onceList in newAllNodeList:
         for node in onceList:
             topoMap[node.topo.id] = node.topo
@@ -523,4 +531,5 @@ def main():
     run()
 
 
-main()
+if __name__ == '__main__':
+    main()

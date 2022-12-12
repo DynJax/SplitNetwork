@@ -9,8 +9,6 @@ class TopoNode:
 
 # conn.txt cont.txt 节点信息
 class Node:
-    neighIDList = []
-    neighSecList = []
 
     def __init__(self, _id: int, _type: int, topo: TopoNode, neighIDList: list):
         self.id = _id

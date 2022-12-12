@@ -4,3 +4,4 @@ con*
 test*
 venv/*
 scheme/*
+tmp/*

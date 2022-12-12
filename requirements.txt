@@ -1,3 +1,0 @@
-prettytable==3.5.0
-Shapely==1.8.5.post1
-wcwidth==0.2.5
